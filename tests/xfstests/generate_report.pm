@@ -14,7 +14,6 @@
 # Maintainer: Yong Sun <yosun@suse.com>
 package generate_report;
 
-use strict;
 use 5.018;
 use warnings;
 use base 'opensusebasetest';
@@ -32,7 +31,7 @@ sub log_end {
     my $file = shift;
     my $cmd = "echo '\nTest run complete' >> $file";
     send_key 'ret';
-    script_run($cmd, proceed_on_failure => 1);
+    script_run($cmd, proceed_on_failure => 1, die_on_timeout => 0);
 }
 
 # Compress all sub directories under $dir and upload them.
@@ -106,11 +105,13 @@ sub run {
     select_serial_terminal;
     sleep 5;
 
-    # Reload uploaded status log back to file
-    script_run('df -h; curl -O ' . autoinst_url . "/files/status.log; cat status.log > $STATUS_LOG", die_on_timeout => 0);
-
-    # Reload test logs if check missing
-    script_run("if [ ! -d $LOG_DIR ]; then mkdir -p $LOG_DIR; curl -O " . autoinst_url . '/files/opt_logs.tar.gz; tar zxvfP opt_logs.tar.gz; fi', die_on_timeout => 0);
+    # Wordaround s390x download log timeout issue poo#122539
+    unless (is_s390x()) {
+        # Reload uploaded status log back to file
+        script_run('df -h; curl -O ' . autoinst_url . "/files/status.log; cat status.log > $STATUS_LOG", die_on_timeout => 0);
+        # Reload test logs if check missing
+        script_run("if [ ! -d $LOG_DIR ]; then mkdir -p $LOG_DIR; curl -O " . autoinst_url . '/files/opt_logs.tar.gz; tar zxvfP opt_logs.tar.gz; fi', die_on_timeout => 0);
+    }
 
     # Finalize status log and upload it
     log_end($STATUS_LOG);
