@@ -50,6 +50,8 @@
       <li><a href="#add_lock_mgr">add_lock_mgr</a></li>
       <li><a href="#is_not_maintenance_update">is_not_maintenance_update</a></li>
       <li><a href="#activate_ntp">activate_ntp</a></li>
+      <li><a href="#script_output_retry_check">script_output_retry_check</a></li>
+      <li><a href="#collect_sbd_delay_parameters">collect_sbd_delay_parameters</a></li>
       <li><a href="#calculate_sbd_start_delay">calculate_sbd_start_delay</a></li>
       <li><a href="#check_iscsi_failure">check_iscsi_failure</a></li>
     </ul>
@@ -226,7 +228,7 @@
 
 <pre><code>ha_export_logs();</code></pre>
 
-<p>Upload HA-relevant logs from SUT. These include: crm configuration, cluster bootstrap log, corosync configuration, <b>hb_report</b>, list of installed packages, list of iSCSI devices, <i>/etc/mdadm.conf</i>, support config and <b>y2logs</b>. If available, logs from the <b>HAWK</b> test, from <b>CTS</b> and from <b>HANA</b> are also included.</p>
+<p>Upload HA-relevant logs from SUT. These include: crm configuration, cluster bootstrap log, corosync configuration, <b>crm report</b>, list of installed packages, list of iSCSI devices, <i>/etc/mdadm.conf</i>, support config and <b>y2logs</b>. If available, logs from the <b>HAWK</b> test, from <b>CTS</b> and from <b>HANA</b> are also included.</p>
 
 <h2 id="check_cluster_state">check_cluster_state</h2>
 
@@ -290,11 +292,31 @@
 
 <p>Enables NTP service in SUT.</p>
 
+<h2 id="script_output_retry_check">script_output_retry_check</h2>
+
+<pre><code>script_output_retry_check(cmd=&gt;$cmd, regex_string=&gt;$regex_sring, [retry=&gt;$retry, sleep=&gt;$sleep, ignore_failure=&gt;$ignore_failure]);</code></pre>
+
+<p>Executes command via &#39;script_output&#39; subroutine and makes a sanity check against a regular expression. Command output is returned after success, otherwise the command is retried defined number of times. Test dies after last unsuccessfull retry.</p>
+
+<p><code>$cmd</code> command being executed. <code>$regex_string</code> regular expression to check output against. <code>$retry</code> number of retries. Defaults to <code>5</code>. <code>$sleep</code> sleep time between retries. Defaults to <code>10s</code>. <code>$ignore_failure</code> do not kill the test upon failure.</p>
+
+<pre><code>Example: script_output_retry_check(cmd=&gt;&#39;hostname&#39;, regex_string=&gt;&#39;^node01$&#39;, retry=&gt;&#39;100&#39;, sleep=&gt;&#39;60&#39;, ignore_failure=&gt;&#39;1&#39;);</code></pre>
+
+<h2 id="collect_sbd_delay_parameters">collect_sbd_delay_parameters</h2>
+
+<pre><code>script_output_retry_check();</code></pre>
+
+<p>Collects parameters required from SUT and returns them in HASH format.</p>
+
 <h2 id="calculate_sbd_start_delay">calculate_sbd_start_delay</h2>
 
-<pre><code>calculate_sbd_start_delay();</code></pre>
+<pre><code>calculate_sbd_start_delay(\%sbd_parameters);</code></pre>
 
-<p>Calculates start time delay after node is fenced. Prevents cluster failure if fenced node restarts too quickly. Delay time is used either if specified in sbd config variable &quot;SBD_DELAY_START&quot; or calculated: &quot;corosync_token + corosync_consensus + SBD_WATCHDOG_TIMEOUT * 2&quot; Variables &#39;corosync_token&#39; and &#39;corosync_consensus&#39; are converted to seconds.</p>
+<p>Calculates start time delay after node is fenced. Prevents cluster failure if fenced node restarts too quickly. Delay time is used either if specified in sbd config variable &quot;SBD_DELAY_START&quot; or calculated: &quot;corosync token timeout + consensus timeout + pcmk_delay_max + msgwait&quot; Variables &#39;corosync_token&#39; and &#39;corosync_consensus&#39; are converted to seconds. For diskless SBD pcmk_delay_max is set to static 30s.</p>
+
+<p>%sbd_parameters = { &#39;corosync_token&#39; =&gt; &lt;runtime.config.totem.token&gt;, &#39;corosync_consensus&#39; =&gt; &lt;runtime.config.totem.consensus&gt;, &#39;sbd_watchdog_timeout&#39; =&gt; &lt;SBD_WATCHDOG_TIMEOUT&gt;, &#39;sbd_delay_start&#39; =&gt; &lt;SBD_DELAY_START&gt;, &#39;pcmk_delay_max&#39; =&gt; &lt;pcmk_delay_max&gt; }</p>
+
+<p>If <code>%sbd_parameters</code> argument is omitted, then function will try to obtain the values from the configuration files.</p>
 
 <h2 id="check_iscsi_failure">check_iscsi_failure</h2>
 
