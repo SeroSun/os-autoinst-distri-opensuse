@@ -19,7 +19,7 @@
       <li><a href="#sles4sap_cleanup">sles4sap_cleanup</a></li>
       <li><a href="#get_hana_topology-Parses-command-output-returns-hash-of-hashes-containing-values-for-each-host">get_hana_topology Parses command output, returns hash of hashes containing values for each host.</a></li>
       <li><a href="#is_hana_online-is_hana_online-timeout-120-wait_for_start-false">is_hana_online is_hana_online([timeout =&gt; 120, wait_for_start =&gt; &#39;false&#39;]);</a></li>
-      <li><a href="#is_hana_resource_running-is_hana_resource_running-timeout-60">is_hana_resource_running is_hana_resource_running([timeout =&gt; 60]);</a></li>
+      <li><a href="#is_hana_resource_running-is_hana_resource_running-quiet-0">is_hana_resource_running is_hana_resource_running([quiet =&gt; 0]);</a></li>
       <li><a href="#stop_hana-stop_hana-timeout-timeout-method-method">stop_hana stop_hana([timeout =&gt; $timeout, method =&gt; $method]);</a></li>
       <li><a href="#start_hana-start_hana-timeout-60">start_hana start_hana([timeout =&gt; 60]);</a></li>
       <li><a href="#cleanup_resource-cleanup_resource-timeout-60">cleanup_resource cleanup_resource([timeout =&gt; 60]);</a></li>
@@ -131,9 +131,17 @@ otherwise it will be executed as root.</code></pre>
 </dd>
 </dl>
 
-<h2 id="is_hana_resource_running-is_hana_resource_running-timeout-60">is_hana_resource_running is_hana_resource_running([timeout =&gt; 60]);</h2>
+<h2 id="is_hana_resource_running-is_hana_resource_running-quiet-0">is_hana_resource_running is_hana_resource_running([quiet =&gt; 0]);</h2>
 
 <pre><code>Checks if resource msl_SAPHana_* is running on given node.</code></pre>
+
+<dl>
+
+<dt id="quiet---if-set-returns-the-value-without-recording-info-default:-0"><b>quiet</b> - if set, returns the value without recording info (default: 0)</dt>
+<dd>
+
+</dd>
+</dl>
 
 <h2 id="stop_hana-stop_hana-timeout-timeout-method-method">stop_hana stop_hana([timeout =&gt; $timeout, method =&gt; $method]);</h2>
 
@@ -199,7 +207,15 @@ Returns hash of found values converted to lowercase and replaces spaces to under
 
 <pre><code>Wait for replica site to sync data with primary.
 Checks &quot;SAPHanaSR-showAttr&quot; output and ensures replica site has &quot;sync_state&quot; &quot;SOK &amp;&amp; PRIM&quot; and no SFAIL.
-Continue after expected output matched three times continually to make sure cluster is synced.</code></pre>
+ Continue after expected output matched N times continually to make sure cluster is synced.
+
+Expected conditions:
+ - Both primary and replica must be online.
+ - primary must have sync_state &#39;PRIM&#39;
+ - primary must have clone_state &#39;PROMOTED&#39;
+ - replica must have sync_state &#39;SOK&#39;  - this means data is in sync
+ - replica must have clone_state &#39;DEMOTED&#39;
+ - site order does not matter</code></pre>
 
 <dl>
 
@@ -319,13 +335,28 @@ in the &quot;ansible: create:&quot; section of config.yaml file.</code></pre>
 <h2 id="azure_fencing_agents_playbook_args">azure_fencing_agents_playbook_args</h2>
 
 <pre><code>azure_fencing_agents_playbook_args(
+    fence_type =&gt; &#39;spn&#39;
     spn_application_id=&gt;$spn_application_id,
     spn_application_password=&gt;$spn_application_password
 );
 
-Collects data and creates string of arguments that can be supplied to playbook.
-spn_application_id - application ID that allows API access for STONITH device
-spn_application_password - password provided for application ID above</code></pre>
+Collects data and creates string of arguments that can be supplied to playbook.</code></pre>
+
+<dl>
+
+<dt id="FENCE_TYPE---Azure-native-fence-type-spn-msi"><b>FENCE_TYPE</b> - Azure native fence type (spn|msi)</dt>
+<dd>
+
+</dd>
+<dt id="SPN_APPLICATION_ID---application-ID-that-allows-API-access-for-STONITH-device"><b>SPN_APPLICATION_ID</b> - application ID that allows API access for STONITH device</dt>
+<dd>
+
+</dd>
+<dt id="SPN_APPLICATION_PASSWORD---password-provided-for-application-ID-above"><b>SPN_APPLICATION_PASSWORD</b> - password provided for application ID above</dt>
+<dd>
+
+</dd>
+</dl>
 
 <h2 id="get_hana_site_names">get_hana_site_names</h2>
 
