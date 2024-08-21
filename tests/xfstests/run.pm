@@ -57,9 +57,9 @@ my $ENABLE_KDUMP = check_var('NO_KDUMP', '1') ? 0 : 1;
 my $VIRTIO_CONSOLE = get_var('VIRTIO_CONSOLE');
 
 # variables set by previous steps
-my $TEST_DEV = get_var('XFSTESTS_TEST_DEV');
-my $SCRATCH_DEV = get_var('XFSTESTS_SCRATCH_DEV');
-my $SCRATCH_DEV_POOL = get_var('XFSTESTS_SCRATCH_DEV_POOL');
+my $TEST_DEV = script_output('echo $TEST_DEV');
+my $SCRATCH_DEV = script_output('echo $SCRATCH_DEV');
+my $SCRATCH_DEV_POOL = script_output('echo $SCRATCH_DEV_POOL');
 my $LOOP_DEVICE = get_var('XFSTESTS_LOOP_DEVICE');
 
 # Debug variables
