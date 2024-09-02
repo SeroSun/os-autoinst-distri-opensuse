@@ -71,7 +71,8 @@ our @EXPORT = qw(
   reload_loop_device
   umount_xfstests_dev
   config_debug_option
-  test_run_without_heartbeat);
+  test_run_without_heartbeat
+  check_bugzilla_status);
 
 =head2 heartbeat_prepare
 
@@ -577,7 +578,7 @@ Run a single test and write log to file but without heartbeat, return log_add ou
 =cut
 
 sub test_run_without_heartbeat {
-    my ($self, $test, $timeout, $fstype, $btrfs_dump, $raw_dump, $scratch_dev, $scratch_dev_pool, $inject_info, $loop_device, $enable_kdump, $virtio_console) = @_;
+    my ($self, $test, $timeout, $fstype, $btrfs_dump, $raw_dump, $scratch_dev, $scratch_dev_pool, $inject_info, $loop_device, $enable_kdump, $virtio_console, $get_stat_log) = @_;
     my ($category, $num) = split(/\//, $test);
     my $run_options = '';
     my $status_num = 1;
@@ -632,8 +633,49 @@ sub test_run_without_heartbeat {
             copy_all_log($category, $num, $fstype, $btrfs_dump, $raw_dump, $scratch_dev, $scratch_dev_pool);
         }
     }
-    # Add test status to STATUS_LOG file
-    return log_add($STATUS_LOG, $test, $test_status, $test_duration);
+    if ($get_stat_log) {
+        # Add test status to STATUS_LOG file
+        return log_add($STATUS_LOG, $test, $test_status, $test_duration);
+    }
+    else {
+        my $status_log = log_add($STATUS_LOG, $test, $test_status, $test_duration);
+        my $log_content = script_output("cat $LOG_DIR/subtest_result_num");
+        my $targs = {
+            name => $test,
+            status => $test_status,
+            time => $test_duration,
+            output => $log_content,
+            status_log => $status_log,
+        };
+        return $targs;
+    }
+}
+
+=head2 check_bugzilla_status
+
+A function use in white list, to check bugzilla status and write messages in output
+
+=cut
+
+sub check_bugzilla_status {
+    my ($entry, $targs) = @_;
+    if (exists $entry->{bugzilla}) {
+        my $info = bugzilla_buginfo($entry->{bugzilla});
+
+        if (!defined($info) || !exists $info->{bug_status}) {
+            $targs->{bugzilla} = "Bugzilla error:\n" .
+              "Failed to query bug #$entry->{bugzilla} status";
+            return;
+        }
+
+        if ($info->{bug_status} =~ /resolved/i || $info->{bug_status} =~ /verified/i) {
+            $targs->{bugzilla} = "Bug closed:\n" .
+              "Bug #$entry->{bugzilla} is closed, ignoring whitelist entry";
+            return;
+        }
+    }
+    $targs->{status} = 'SOFTFAILED' unless $entry->{keep_fail};
+    $targs->{failinfo} = $entry->{message};
 }
 
 1;

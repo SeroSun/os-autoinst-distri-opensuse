@@ -84,6 +84,10 @@ my $HB_DONE = '<d>';
 # - XFSTESTS_TIMEOUT: Set the sub-test timeout threshold
 my $TIMEOUT_NO_HEARTBEAT = get_var('XFSTESTS_TIMEOUT', 2000);
 
+my ($type, $status, $time, $output);
+my $whitelist;
+my $whitelist_env = prepare_whitelist_environment();
+my %softfail_list = generate_xfstests_list(get_var('XFSTESTS_SOFTFAIL'));
 
 sub run {
     my $self = shift;
@@ -126,7 +130,7 @@ sub run {
     # Generate xfstests blacklist
     my %black_list = (generate_xfstests_list($BLACKLIST), exclude_grouplist($TEST_RANGES, $GROUPLIST, $FSTYPE));
     if (my $issues = get_var('XFSTESTS_KNOWN_ISSUES')) {
-        my $whitelist = LTP::WhiteList->new($issues);
+        $whitelist = LTP::WhiteList->new($issues);
         my %skipped = map { $_ => 1 } $whitelist->list_skipped_tests($whitelist_env, $TEST_SUITE);
         %black_list = (%black_list, %skipped);
     }
@@ -139,56 +143,85 @@ sub run {
         if (exists($black_list{$test})) {
             next;
         }
-
         umount_xfstests_dev($TEST_DEV, $SCRATCH_DEV, $SCRATCH_DEV_POOL) unless get_var('XFSTESTS_HIGHSPEED');
 
         # Run test and wait for it to finish
         my ($category, $num) = split(/\//, $test);
         enter_cmd("echo $test > /dev/$serialdev");
+        my $result_args = {};
         if ($enable_heartbeat == 0) {
-            $status_log_content = test_run_without_heartbeat($self, $test, $TIMEOUT_NO_HEARTBEAT, $FSTYPE, $BTRFS_DUMP, $RAW_DUMP, $SCRATCH_DEV, $SCRATCH_DEV_POOL, $INJECT_INFO, $LOOP_DEVICE, $ENABLE_KDUMP, $VIRTIO_CONSOLE);
-            next;
+	    #$status_log_content = test_run_without_heartbeat($self, $test, $TIMEOUT_NO_HEARTBEAT, $FSTYPE, $BTRFS_DUMP, $RAW_DUMP, $SCRATCH_DEV, $SCRATCH_DEV_POOL, $INJECT_INFO, $LOOP_DEVICE, $ENABLE_KDUMP, $VIRTIO_CONSOLE);
+            $result_args = test_run_without_heartbeat($self, $test, $TIMEOUT_NO_HEARTBEAT, $FSTYPE, $BTRFS_DUMP, $RAW_DUMP, $SCRATCH_DEV, $SCRATCH_DEV_POOL, $INJECT_INFO, $LOOP_DEVICE, $ENABLE_KDUMP, $VIRTIO_CONSOLE, 0);
+            $status = $result_args->{status};
+            $time = $result_args->{time};
+            $output = $result_args->{output};
+            $status_log_content = $result_args->{status_log};
         }
-        test_run($test, $FSTYPE, $INJECT_INFO);
-        my ($type, $status, $time) = test_wait($SUBTEST_MAX_TIME, $HB_TIMEOUT, $VIRTIO_CONSOLE);
-        if ($type eq $HB_DONE) {
-            # Test finished without crashing SUT
-            $status_log_content = log_add($STATUS_LOG, $test, $status, $time);
-            copy_all_log($category, $num, $FSTYPE, $BTRFS_DUMP, $RAW_DUMP, $SCRATCH_DEV, $SCRATCH_DEV_POOL) if ($status =~ /FAILED/);
-            next;
-        }
-
-        # Here script already know the SUT crashed/hanged.
-        # To adapt two scenarios:
-        # 1. system hang in root console during run subtests;
-        # 2. system already crash and reboot by itself and waiting in bootloader screen.
-        # Here to reboot "again" to keep logic and real screen in the same page. After reboot to continue the rest tests.
-        eval {
-            prepare_system_shutdown;
-            check_var('VIRTIO_CONSOLE', '1') ? power('reset') : send_key 'alt-sysrq-b';
-            reconnect_mgmt_console if is_pvm;
-            $self->wait_boot;
-        };
-
-        sleep(1);
-        select_console('root-console');
-        # Save kdump data to KDUMP_DIR if not set "NO_KDUMP=1"
-        if ($ENABLE_KDUMP) {
-            unless (save_kdump($test, $KDUMP_DIR, vmcore => 1, kernel => 1, debug => 1)) {
-                # If no kdump data found, write warning to log
-                my $msg = "Warning: $test crashed SUT but has no kdump data";
-                script_run("echo '$msg' >> $LOG_DIR/$category/$num");
+	else {
+            test_run($test, $FSTYPE, $INJECT_INFO);
+            ($type, $status, $time) = test_wait($SUBTEST_MAX_TIME, $HB_TIMEOUT, $VIRTIO_CONSOLE);
+            if ($type eq $HB_DONE) {
+                # Test finished without crashing SUT
+                $status_log_content = log_add($STATUS_LOG, $test, $status, $time);
+                copy_all_log($category, $num, $FSTYPE, $BTRFS_DUMP, $RAW_DUMP, $SCRATCH_DEV, $SCRATCH_DEV_POOL) if ($status =~ /FAILED/);
+            }
+            else {
+                # Here script already know the SUT crashed/hanged.
+                # To adapt two scenarios:
+                # 1. system hang in root console during run subtests;
+                # 2. system already crash and reboot by itself and waiting in bootloader screen.
+                # Here to reboot "again" to keep logic and real screen in the same page. After reboot to continue the rest tests.
+                eval {
+                    prepare_system_shutdown;
+                    check_var('VIRTIO_CONSOLE', '1') ? power('reset') : send_key 'alt-sysrq-b';
+                    reconnect_mgmt_console if is_pvm;
+                    $self->wait_boot;
+                };
+                sleep(1);
+                select_console('root-console');
+                # Save kdump data to KDUMP_DIR if not set "NO_KDUMP=1"
+                if ($ENABLE_KDUMP) {
+                    unless (save_kdump($test, $KDUMP_DIR, vmcore => 1, kernel => 1, debug => 1)) {
+                        # If no kdump data found, write warning to log
+                        my $msg = "Warning: $test crashed SUT but has no kdump data";
+                        script_run("echo '$msg' >> $LOG_DIR/$category/$num");
+                    }
+                }
+                # Add test status to STATUS_LOG file
+                log_add($STATUS_LOG, $test, $status, $time);
+                # Reload loop device after a reboot
+                reload_loop_device($self, $FSTYPE) if get_var('XFSTESTS_LOOP_DEVICE');
+                # Prepare for the next test
+                heartbeat_start;
             }
         }
-
-        # Add test status to STATUS_LOG file
-        log_add($STATUS_LOG, $test, $status, $time);
-
-        # Reload loop device after a reboot
-        reload_loop_device($self, $FSTYPE) if get_var('XFSTESTS_LOOP_DEVICE');
-
-        # Prepare for the next test
-        heartbeat_start;
+        record_info('INFO', "name: $test\ntest result: $status\ntime: $time\n");
+	(my $generate_name = $test) =~ s/-/\//;
+	my $test_path = '/opt/log/' . $generate_name;
+	bmwqemu::fctinfo("$generate_name");
+	if ($status =~ /FAILED|SKIPPED/) {
+		my $targs = OpenQA::Test::RunArgs->new();
+		my $whitelist_entry;
+		$targs->{output} = script_output("if [ -f $test_path ]; then tail -n 200 $test_path | sed \"s/'//g\" | tr -cd '\\11\\12\\15\\40-\\176'; else echo 'No log in test path, find log in serial0.txt'; fi", 600);
+		$targs->{name} = $test;
+		$targs->{time} = $time;
+		$targs->{status} = $status;
+		if ($status =~ /FAILED/) {
+			$targs->{outbad} = script_output("if [ -f $test_path.out.bad ]; then tail -n 200 $test_path.out.bad | sed \"s/'//g\" | tr -cd '\\11\\12\\15\\40-\\176'; else echo '$test_path.out.bad not exist';fi", 600);
+			$targs->{fullog} = script_output("if [ -f $test_path.full ]; then tail -n 200 $test_path.full | sed \"s/'//g\" | tr -cd '\\11\\12\\15\\40-\\176'; else echo '$test_path.full not exist'; fi", 600);
+			$targs->{dmesg} = script_output("if [ -f $test_path.dmesg ]; then tail -n 200 $test_path.dmesg | sed \"s/'//g\" | tr -cd '\\11\\12\\15\\40-\\176'; fi", 600);
+			#$targs->{outbad} = "test_outbad";
+			#$targs->{fullog} = "test_fulllog";
+			#$targs->{dmesg} = "test_dmesg";
+			if (exists($softfail_list{$generate_name})) {
+				$targs->{status} = 'SOFTFAILED';
+				$targs->{failinfo} = 'XFSTESTS_SOFTFAIL';
+			}
+			$whitelist_entry = $whitelist->find_whitelist_entry($whitelist_env, $TEST_SUITE, $generate_name) if defined($whitelist);
+			check_bugzilla_status($whitelist_entry, $targs) if ($whitelist_entry);
+		}
+		autotest::loadtest("tests/xfstests/xfstests_failed.pm", name => $test, run_args => $targs);
+	}
     }
     heartbeat_stop($VIRTIO_CONSOLE) if $enable_heartbeat == 1;
 

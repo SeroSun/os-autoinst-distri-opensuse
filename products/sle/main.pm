@@ -799,13 +799,13 @@ elsif (get_var('XFSTESTS')) {
         else {
             loadtest 'xfstests/partition';
             loadtest 'xfstests/run';
-            loadtest 'xfstests/generate_report';
+	    #loadtest 'xfstests/generate_report';
         }
     }
     else {
         loadtest 'xfstests/partition';
         loadtest 'xfstests/run';
-        loadtest 'xfstests/generate_report';
+	#loadtest 'xfstests/generate_report';
     }
 }
 elsif (get_var("BTRFS_PROGS")) {
