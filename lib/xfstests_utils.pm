@@ -430,6 +430,7 @@ sub copy_fsxops {
     my ($category, $num) = @_;
     my $cmd = "if [ -e $TEST_FOLDER/junk.fsxops ]; then cp $TEST_FOLDER/junk.fsxops $LOG_DIR/$category/$num.junk.fsxops; fi";
     script_run($cmd);
+    record_info('junk.fsxops log', script_output("find $LOG_DIR/$category/ -name $num.junk.fsxops -type f -exec cat {} +"));
 }
 
 =head2 dump_btrfs_img
