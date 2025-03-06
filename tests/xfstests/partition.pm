@@ -403,14 +403,14 @@ sub setup_nfs_server {
     }
     assert_script_run('exportfs -a && systemctl restart rpcbind && systemctl enable nfs-server.service && systemctl restart nfs-server');
     if ($nfsversion =~ 'pnfs') {
-        script_run('mount -t nfs4 -o vers=4.1,minorversion=1 localhost:/opt/export/test /opt/nfs/test');
+        script_run('mount -t nfs4 -o vers=4.1,minorversion=1 localhost:/opt/export/test /opt/nfs/test', 180);
         record_info('pNFS_checkpoint', script_output('cat /proc/self/mountstats | grep pnfs', proceed_on_failure => 1));
     }
     elsif ($nfsversion =~ '4') {
-        script_run("mount -t nfs4 -o vers=$nfsversion localhost:/opt/export/test /opt/nfs/test");
+        script_run("mount -t nfs4 -o vers=$nfsversion localhost:/opt/export/test /opt/nfs/test", 180);
     }
     else {
-        script_run("mount -t nfs -o vers=$nfsversion localhost:/opt/export/test /opt/nfs/test");
+        script_run("mount -t nfs -o vers=$nfsversion localhost:/opt/export/test /opt/nfs/test", 180);
     }
     record_info('/etc/exports', script_output('cat /etc/exports', proceed_on_failure => 1));
     record_info('nfsstat -m', script_output('nfsstat -m', proceed_on_failure => 1));
