@@ -175,7 +175,7 @@ sub create_loop_device_by_rootsize {
         $amount = 5;
     }
     # Use 90% of free space, not use all space in /root
-    $size = int($para{size} * 0.9);
+    $size = int($para{size} * 0.8);
     # get device size from XFSTESTS_PART_SIZE, other devices share the rest
     if (my @part_list = split(/,/, get_var('XFSTESTS_PART_SIZE'))) {
         my $list_remaining = $amount + 1 - (scalar @part_list);
@@ -183,7 +183,7 @@ sub create_loop_device_by_rootsize {
         foreach (0 .. $amount) { push(@loop_dev_size, shift(@part_list) . 'M'); }
     }
     else {
-        $size > (20480 * ($amount + 1)) ? ($size = 20480) : ($size = int($size / ($amount + 1)));
+        $size > (20480 * ($amount + 1)) ? ($size = 20480) : ($size = int(0.9 * $size / ($amount + 1)));
         foreach (0 .. $amount) { push(@loop_dev_size, $size . 'M'); }
     }
     @filename = ('test_dev');
