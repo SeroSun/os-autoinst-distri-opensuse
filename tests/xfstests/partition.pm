@@ -134,7 +134,7 @@ sub do_partition_for_xfstests {
     # Create mount points
     script_run("mkdir $TEST_FOLDER $SCRATCH_FOLDER");
     # Setup configure file xfstests/local.config
-    script_run("echo 'export FSTYP=$para{fstype}' >> $CONFIG_FILE");
+    script_run("echo 'export FSTYP=$para{fstype}' >> $CONFIG_FILE") if ($para{fstype} !~ /overlay/);
     script_run("echo 'export TEST_DEV=$test_dev' >> $CONFIG_FILE");
     set_var('XFSTESTS_TEST_DEV', $test_dev);
     script_run("echo 'export TEST_DIR=$TEST_FOLDER' >> $CONFIG_FILE");
@@ -197,7 +197,6 @@ sub create_loop_device_by_rootsize {
         my $ovl_base_fs = get_var('XFSTESTS_OVERLAY_BASE_FS', 'xfs');
         format_with_options("$INST_DIR/test_dev", $ovl_base_fs);
         format_with_options("$INST_DIR/scratch_dev1", $ovl_base_fs);
-        script_run("echo 'export FSTYP=$ovl_base_fs' >> $CONFIG_FILE");
     }
     else {
         format_with_options("$INST_DIR/test_dev", $para{fstype});
