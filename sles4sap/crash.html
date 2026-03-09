@@ -15,10 +15,11 @@
   <li><a href="#SYNOPSIS">SYNOPSIS</a>
     <ul>
       <li><a href="#crash_deploy_name">crash_deploy_name</a></li>
+      <li><a href="#crash_vm_name">crash_vm_name</a></li>
       <li><a href="#crash_deploy_azure">crash_deploy_azure</a></li>
       <li><a href="#crash_deploy_aws">crash_deploy_aws</a></li>
       <li><a href="#crash_deploy_gcp">crash_deploy_gcp</a></li>
-      <li><a href="#crush_pubip">crush_pubip</a></li>
+      <li><a href="#crash_pubip">crash_pubip</a></li>
       <li><a href="#crash_get_username">crash_get_username</a></li>
       <li><a href="#crash_get_instance">crash_get_instance</a></li>
       <li><a href="#crash_cleanup">crash_cleanup</a></li>
@@ -41,6 +42,20 @@
 <pre><code>my $name = crash_deploy_name();</code></pre>
 
 <p>Return the deploy name. Azure use it as resource group name</p>
+
+<h2 id="crash_vm_name">crash_vm_name</h2>
+
+<pre><code>my $vm_name = crash_vm_name(provider =&gt; &#39;AZURE&#39;);</code></pre>
+
+<p>Returns the VM name for a given cloud provider. This function is designed to be called before VM creation, as it does not require a running VM to determine the name. It is used when composing Azure or GCE CLI commands for VM creation, creating the <code>publiccloud::instance</code> object to populate the <code>instance_id</code> field, and during VM deletion. Note that EC2 does not need or allow specifying a name in this way, so this function is not supported for the EC2 provider.</p>
+
+<dl>
+
+<dt id="provider---Cloud-provider-name-AZURE-GCE"><b>provider</b> - Cloud provider name (AZURE, GCE)</dt>
+<dd>
+
+</dd>
+</dl>
 
 <h2 id="crash_deploy_azure">crash_deploy_azure</h2>
 
@@ -96,7 +111,7 @@
 <dd>
 
 </dd>
-<dt id="zone---GCP-zone-e.g.-us-central1-a"><b>zone</b> - GCP zone (e.g., &#39;us-central1-a&#39;)</dt>
+<dt id="availability_zone---GCP-zone"><b>availability_zone</b> - GCP zone</dt>
 <dd>
 
 </dd>
@@ -104,7 +119,7 @@
 <dd>
 
 </dd>
-<dt id="version---OS-version"><b>version</b> - OS version</dt>
+<dt id="image_name---image-name"><b>image_name</b> - image name</dt>
 <dd>
 
 </dd>
@@ -116,13 +131,13 @@
 <dd>
 
 </dd>
-<dt id="ssh_key---ssh_key-file"><b>ssh_key</b> - ssh_key file</dt>
+<dt id="ssh_pub_key---ssh_key-file"><b>ssh_pub_key</b> - ssh_key file</dt>
 <dd>
 
 </dd>
 </dl>
 
-<h2 id="crush_pubip">crush_pubip</h2>
+<h2 id="crash_pubip">crash_pubip</h2>
 
 <p>Get the deployment public IP of the VM. Die if an unsupported csp name is provided.</p>
 
@@ -132,7 +147,11 @@
 <dd>
 
 </dd>
-<dt id="region-deployment-region"><b>region</b> deployment region</dt>
+<dt id="region---deployment-region"><b>region</b> - deployment region</dt>
+<dd>
+
+</dd>
+<dt id="availability_zone---only-required-for-GCE"><b>availability_zone</b> - only required for GCE</dt>
 <dd>
 
 </dd>
@@ -156,7 +175,8 @@
 
 <pre><code>my $instance = crash_get_instance(
     provider =&gt; &#39;GCE&#39;,
-    region =&gt; &#39;us-central1&#39;);</code></pre>
+    region =&gt; &#39;us-central1&#39;,
+    availability_zone =&gt; &#39;b&#39;);</code></pre>
 
 <p>Create and return a publiccloud::instance object for the crash test VM</p>
 
@@ -167,6 +187,10 @@
 
 </dd>
 <dt id="region---Cloud-region"><b>region</b> - Cloud region</dt>
+<dd>
+
+</dd>
+<dt id="availability_zone---GCP-availability-zone-optional"><b>availability_zone</b> - GCP availability zone (optional)</dt>
 <dd>
 
 </dd>
@@ -187,6 +211,10 @@
 
 </dd>
 <dt id="region---Cloud-region1"><b>region</b> - Cloud region</dt>
+<dd>
+
+</dd>
+<dt id="availability_zone---only-required-for-GCE1"><b>availability_zone</b> - only required for GCE</dt>
 <dd>
 
 </dd>
@@ -243,7 +271,7 @@ If C&lt;reg_code&gt; is provided, registers the system and verifies with C&lt;SU
 <dd>
 
 </dd>
-<dt id="username-Public-IP-address-of-the-SUT-can-be-calculated-by-crash_pubip"><b>username</b> Public IP address of the SUT, can be calculated by crash_pubip</dt>
+<dt id="username-Username-for-SSH-login-can-be-calculated-by-crash_get_username"><b>username</b> Username for SSH login, can be calculated by crash_get_username</dt>
 <dd>
 
 </dd>
@@ -271,7 +299,7 @@ If C&lt;reg_code&gt; is provided, registers the system and verifies with C&lt;SU
 
 <dl>
 
-<dt id="zone---GCP-zone-where-the-deployment-was-created"><b>zone</b> - GCP zone where the deployment was created</dt>
+<dt id="availability_zone---GCP-availability-zone-where-the-deployment-was-created"><b>availability_zone</b> - GCP availability zone where the deployment was created</dt>
 <dd>
 
 </dd>
