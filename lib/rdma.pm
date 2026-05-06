@@ -40,12 +40,13 @@ sub install_rdma_dependency {
       libibverbs-utils
     );
     my $kernel_version = get_var('KERNEL_VERSION');
+    my $kver;
     if ($kernel_version) {
-        my $kver = script_output("rpm -q kernel-default --queryformat '%{VERSION}-%{RELEASE}\\n' | grep '$kernel_version'");
-        push @deps, "kernel-default-extra=$kver";
+        $kver = script_output("rpm -q kernel-default --queryformat '%{VERSION}-%{RELEASE}\\n' | grep '$kernel_version'");
     } else {
-        push @deps, 'kernel-default-extra';
+        $kver = script_output("rpm -q kernel-default --queryformat '%{VERSION}-%{RELEASE}\\n'");
     }
+    push @deps, "kernel-default-extra=$kver";
     my $packages = join(' ', @deps);
     script_run('zypper --gpg-auto-import-keys ref');
     install_package($packages, trup_reboot => 1);
