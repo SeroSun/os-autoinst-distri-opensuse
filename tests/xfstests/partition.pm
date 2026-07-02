@@ -196,13 +196,8 @@ sub create_loop_device_by_rootsize {
             # chattr +C must be set on empty file to disable CoW/compression on Btrfs hosts
             assert_script_run("touch $INST_DIR/$_");
             script_run("chattr +C $INST_DIR/$_ 2>/dev/null || true");
-            my $size_mb = str_to_mb($loop_dev_size[$i]);
-            record_info('Loop device (dd)', "Creating $_ with dd: $loop_dev_size[$i] ($size_mb MB)");
-            assert_script_run("dd if=/dev/zero of=$INST_DIR/$_ bs=1M count=$size_mb conv=fsync status=progress", 1200);
-        } else {
-            assert_script_run("fallocate -l $loop_dev_size[$i] $INST_DIR/$_", 300);
         }
-
+        assert_script_run("fallocate -l $loop_dev_size[$i] $INST_DIR/$_", 300);
         $i++;
         assert_script_run("losetup -fP $INST_DIR/$_", 300);
     }
