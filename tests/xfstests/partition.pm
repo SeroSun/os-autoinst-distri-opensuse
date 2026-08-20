@@ -422,6 +422,88 @@ sub install_dependencies_overlayfs {
     }
 }
 
+# --------------------------------------------------------------------------
+# TEMPORARY DEBUG CODE - branch yosun/debug-tls, DO NOT MERGE
+#
+# Collects everything needed to file the "NFS over TLS fails while SELinux is
+# enforcing" bug without having to hand-copy output out of a VNC console.
+# Everything lands in a single /tmp/tls-debug.tar.xz that can be attached to
+# Bugzilla as is, and the important parts are additionally shown as record_info
+# so they can be selected and pasted from the openQA job page.
+#
+# This must not be merged: it installs extra packages, flips SELinux between
+# enforcing and permissive and performs a mount A/B test, none of which belong
+# in a production run.
+# --------------------------------------------------------------------------
+my $TLS_DEBUG_DIR = '/tmp/tls-debug';
+
+# ausearch comes from the audit package, audit2allow from policycoreutils; the
+# package holding audit2allow was renamed across products, so try both names.
+sub tls_debug_install_tools {
+    script_run('zypper -n --gpg-auto-import-keys in audit policycoreutils policycoreutils-python-utils'
+          . ' || zypper -n in audit policycoreutils python3-policycoreutils', timeout => 900);
+    script_run('systemctl start auditd');
+}
+
+sub tls_debug_dump {
+    my ($stage) = @_;
+    my $dir = "$TLS_DEBUG_DIR/$stage";
+    script_run("mkdir -p $dir");
+
+    # Ordered so the tarball reads top to bottom like the bug report itself.
+    my @collect = (
+        ['selinux.log', 'sestatus; echo ===; cat /etc/selinux/config; echo ===; cat /proc/cmdline'
+              . '; echo ===; semodule -l | grep -i tls; echo ===; ps -eZ | grep tlshd'
+              . '; echo ===; matchpathcon /usr/sbin/tlshd; echo ===; ls -Z /usr/sbin/tlshd'],
+        ['versions.log', 'rpm -q --qf "%{NAME}-%{VERSION}-%{RELEASE} built:%{BUILDTIME:date}\n"'
+              . ' selinux-policy selinux-policy-targeted ktls-utils nfs-kernel-server nfs-client'
+              . ' gnutls kernel-default; echo ===; uname -a; echo ===; rpm -q --changelog selinux-policy | head -n 80'],
+        ['tlshd.log', 'systemctl status tlshd --no-pager -l; echo ===; journalctl -u tlshd -b --no-pager'],
+        ['avc.log', 'journalctl -k -b --no-pager | grep -i "avc:"; echo ===; ausearch -m AVC,USER_AVC,SELINUX_ERR -ts boot'],
+        ['audit2allow.te', 'ausearch -m AVC -ts boot -c tlshd | audit2allow -R'],
+        ['certs.log', 'ls -l --time-style=full-iso /etc/tlshd/'
+              . '; echo ===; openssl x509 -in /etc/tlshd/ca.pem -noout -dates -subject'
+              . '; echo ===; openssl x509 -in /etc/tlshd/server.pem -noout -dates -subject -ext subjectAltName'
+              . '; echo ===; openssl x509 -in /etc/tlshd/client.pem -noout -dates -subject -ext subjectAltName'
+              . '; echo ===; openssl verify -CAfile /etc/tlshd/ca.pem /etc/tlshd/server.pem /etc/tlshd/client.pem'],
+        ['nfs.log', 'cat /etc/tlshd.conf; echo ===; cat /etc/exports; echo ===; exportfs -v'
+              . '; echo ===; cat /opt/xfstests/local.config; echo ===; nfsstat -m; echo ===; mount | grep nfs'],
+    );
+
+    for my $item (@collect) {
+        my ($file, $cmd) = @$item;
+        script_run("{ $cmd ; } > $dir/$file 2>&1", timeout => 300);
+        # Only a tail goes to record_info, the full file is in the tarball. The
+        # tr strips control characters that would upset the serial console.
+        record_info("tls-debug $stage: $file", script_output(
+                "tail -n 150 $dir/$file | tr -cd '\\11\\12\\15\\40-\\176'",
+                proceed_on_failure => 1, timeout => 180));
+    }
+}
+
+# The AVC only shows up once a handshake has actually been attempted, so drive
+# the mount both ways. Bounded with timeout(1) because a rejected handshake
+# makes mount(8) sit there for minutes.
+sub tls_debug_mount_ab {
+    my ($vers) = @_;
+    my $probe = "umount /opt/nfs/test 2>/dev/null; echo \"== mode: \$(getenforce)\"; "
+      . "timeout 180 mount -t nfs -o rw,relatime,vers=$vers,sec=sys,xprtsec=mtls 127.0.0.1:/opt/export/test /opt/nfs/test; "
+      . "echo \"== mount rc=\$?\"; mount | grep /opt/nfs/test; umount /opt/nfs/test 2>/dev/null";
+
+    script_run('setenforce 1');
+    record_info('tls-debug: mount enforcing', script_output($probe, proceed_on_failure => 1, timeout => 600));
+    script_run('setenforce 0');
+    record_info('tls-debug: mount permissive', script_output($probe, proceed_on_failure => 1, timeout => 600));
+    # Leave the SUT in the product default so the following xfstests run still
+    # reproduces the real failure.
+    script_run('setenforce 1');
+}
+
+sub tls_debug_upload {
+    script_run("tar -cJf /tmp/tls-debug.tar.xz -C /tmp " . basename($TLS_DEBUG_DIR), timeout => 120);
+    upload_logs('/tmp/tls-debug.tar.xz', timeout => 300, log_name => 'tls-debug.tar.xz');
+}
+
 sub setup_ktls {
     my $tlshd_dir = '/etc/tlshd';
     assert_script_run("mkdir $tlshd_dir; cd $tlshd_dir");
@@ -434,10 +516,12 @@ sub setup_ktls {
     assert_script_run("openssl req -new -nodes -newkey rsa:2048 -keyout client.key -out client.csr -subj \"/CN=nfs-client\" -addext \"subjectAltName=IP:127.0.0.1,IP:0:0:0:0:0:0:0:1\"");
     assert_script_run("openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out client.pem -days 365 -extfile <(printf \"subjectAltName=IP:127.0.0.1,IP:0:0:0:0:0:0:0:1\")");
     script_run('cd -');
+    # DEBUG BRANCH: loglevel raised from 1 to 3 so the journal carries the full
+    # GnuTLS handshake trace.
     my $content = <<END;
 [debug]
-loglevel=1
-tls=1
+loglevel=3
+tls=3
 nl=1
 
 [authenticate.client]
@@ -453,6 +537,9 @@ END
     write_sut_file('/etc/tlshd.conf', $content);
     script_run("sed -i '/^ExecStart/ s|ExecStart=.*|ExecStart=/usr/sbin/tlshd -c /etc/tlshd.conf|' /usr/lib/systemd/system/tlshd.service");
     script_run('systemctl daemon-reload; systemctl enable tlshd.service; systemctl start tlshd.service');
+    # DEBUG BRANCH
+    tls_debug_install_tools;
+    tls_debug_dump('1-after-tlshd-start');
 }
 
 sub setup_krb5 {
@@ -588,6 +675,14 @@ sub setup_nfs_client {
     # There's a graceful time we need to wait before using the NFS server
     my $gracetime = script_output('cat /proc/fs/nfsd/nfsv4gracetime;');
     sleep($gracetime * 2);
+    # DEBUG BRANCH: the AVC is only emitted once a handshake has been attempted,
+    # so the second dump has to come after the mount probe.
+    if ($nfsversion =~ 'TLS') {
+        my ($vers_num) = $nfsversion =~ /-([\d.]+)/;
+        tls_debug_mount_ab($vers_num || '4.2');
+        tls_debug_dump('2-after-mount-probe');
+        tls_debug_upload;
+    }
 }
 
 sub run {
