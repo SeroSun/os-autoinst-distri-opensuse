@@ -443,6 +443,11 @@ sub tls_debug_install_tools {
     script_run('zypper -n --gpg-auto-import-keys in audit policycoreutils policycoreutils-python-utils'
           . ' || zypper -n in audit policycoreutils python3-policycoreutils', timeout => 900);
     script_run('systemctl start auditd');
+    # The first run found no AVC at all even though setenforce clearly changes
+    # the outcome, which means the denial is covered by a dontaudit rule.
+    # Rebuild the policy with dontaudit disabled so it gets logged; restored in
+    # tls_debug_upload.
+    script_run('semodule -DB', timeout => 600);
 }
 
 sub tls_debug_dump {
@@ -459,8 +464,14 @@ sub tls_debug_dump {
               . ' selinux-policy selinux-policy-targeted ktls-utils nfs-kernel-server nfs-client'
               . ' gnutls kernel-default; echo ===; uname -a; echo ===; rpm -q --changelog selinux-policy | head -n 80'],
         ['tlshd.log', 'systemctl status tlshd --no-pager -l; echo ===; journalctl -u tlshd -b --no-pager'],
-        ['avc.log', 'journalctl -k -b --no-pager | grep -i "avc:"; echo ===; ausearch -m AVC,USER_AVC,SELINUX_ERR -ts boot'],
-        ['audit2allow.te', 'ausearch -m AVC -ts boot -c tlshd | audit2allow -R'],
+        ['avc.log', 'auditctl -s; echo ===; ls -l /var/log/audit/; echo ===; semodule -l | wc -l'
+              . '; echo === journal; journalctl -k -b --no-pager | grep -i "avc:"'
+              . '; echo === dmesg; dmesg | grep -i "avc:"'
+              . '; echo === ausearch-all; ausearch -m AVC,USER_AVC,SELINUX_ERR -ts boot'],
+        # No -c filter: the first attempt used -c tlshd and found nothing, the
+        # denial may well be attributed to another comm.
+        ['audit2allow.te', 'ausearch -m AVC,USER_AVC -ts boot | audit2allow -R'
+              . '; echo "=== tlshd only ==="; ausearch -m AVC,USER_AVC -ts boot -c tlshd | audit2allow -R'],
         ['certs.log', 'ls -l --time-style=full-iso /etc/tlshd/'
               . '; echo ===; openssl x509 -in /etc/tlshd/ca.pem -noout -dates -subject'
               . '; echo ===; openssl x509 -in /etc/tlshd/server.pem -noout -dates -subject -ext subjectAltName'
@@ -502,6 +513,8 @@ sub tls_debug_mount_ab {
 sub tls_debug_upload {
     script_run("tar -cJf /tmp/tls-debug.tar.xz -C /tmp " . basename($TLS_DEBUG_DIR), timeout => 120);
     upload_logs('/tmp/tls-debug.tar.xz', timeout => 300, log_name => 'tls-debug.tar.xz');
+    # Re-enable the dontaudit rules disabled in tls_debug_install_tools.
+    script_run('semodule -B', timeout => 600);
 }
 
 sub setup_ktls {
