@@ -319,8 +319,8 @@ elsif (get_var('SECURITY_TEST')) {
     load_security_tests();
 }
 elsif (get_var('XFSTESTS')) {
-    prepare_target();
     if (check_var('XFSTESTS', 'installation')) {
+        prepare_target();
         loadtest 'xfstests/install';
         unless (get_var('NO_KDUMP')) {
             loadtest 'xfstests/enable_kdump';
@@ -328,6 +328,18 @@ elsif (get_var('XFSTESTS')) {
         loadtest 'shutdown/shutdown';
     }
     else {
+        # With KOTD_REPO set, replace the kernel in the image before testing. This is
+        # what lets a kernel-source bisect reuse one xfstests HDD across many kernels.
+        # kernel/update_kernel takes the place of prepare_target(): it boots the image
+        # itself (boot_to_console -> wait_boot), so it must not be preceded by a boot
+        # module, and finish_update reboots without waiting, so one must follow it.
+        if (get_var('KOTD_REPO') && get_var('BOOT_HDD_IMAGE')) {
+            loadtest 'kernel/update_kernel';
+            loadtest 'boot/boot_to_desktop';
+        }
+        else {
+            prepare_target();
+        }
         loadtest 'xfstests/partition';
         loadtest 'xfstests/run';
     }
