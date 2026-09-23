@@ -319,8 +319,8 @@ elsif (get_var('SECURITY_TEST')) {
     load_security_tests();
 }
 elsif (get_var('XFSTESTS')) {
-    prepare_target();
     if (check_var('XFSTESTS', 'installation')) {
+        prepare_target();
         loadtest 'xfstests/install';
         unless (get_var('NO_KDUMP')) {
             loadtest 'xfstests/enable_kdump';
@@ -328,6 +328,22 @@ elsif (get_var('XFSTESTS')) {
         loadtest 'shutdown/shutdown';
     }
     else {
+        # Bisecting a kernel regression means running the same xfstests image
+        # against many kernel builds, so the kernel has to be replaced before
+        # the tests start. kernel/update_kernel takes the place of
+        # prepare_target() rather than following it: it boots the image itself
+        # (boot_to_console -> wait_boot), so no boot module may precede it, and
+        # finish_update() reboots without waiting, so one has to follow it.
+        # Same ordering as schedule/kernel/run_kselftests.yaml.
+        if (get_var('XFSTESTS_AUTO_BISECT')) {
+            get_required_var('KOTD_REPO');
+            get_required_var('BOOT_HDD_IMAGE');
+            loadtest 'kernel/update_kernel';
+            loadtest 'boot/boot_to_desktop';
+        }
+        else {
+            prepare_target();
+        }
         loadtest 'xfstests/partition';
         loadtest 'xfstests/run';
     }
