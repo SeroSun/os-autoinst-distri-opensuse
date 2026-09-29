@@ -20,6 +20,7 @@
       <li><a href="#config_guest_params">config_guest_params</a></li>
       <li><a href="#revise_guest_version_and_build">revise_guest_version_and_build</a></li>
       <li><a href="#print_guest_params">print_guest_params</a></li>
+      <li><a href="#is_guest_ppc64le">is_guest_ppc64le</a></li>
       <li><a href="#prepare_common_environment">prepare_common_environment</a></li>
       <li><a href="#prepare_ssh_key">prepare_ssh_key</a></li>
       <li><a href="#prepare_non_transactional_environment">prepare_non_transactional_environment</a></li>
@@ -32,7 +33,7 @@
       <li><a href="#config_guest_numa">config_guest_numa</a></li>
       <li><a href="#config_guest_virtualization">config_guest_virtualization</a></li>
       <li><a href="#config_guest_platform">config_guest_platform</a></li>
-      <li><a href="#config_guest_os_variant">config_guest_os_variant</a></li>
+      <li><a href="#config_guest_osinfo">config_guest_osinfo</a></li>
       <li><a href="#config_guest_graphics_and_video">config_guest_graphics_and_video</a></li>
       <li><a href="#config_guest_channels">config_guest_channels</a></li>
       <li><a href="#config_guest_consoles">config_guest_consoles</a></li>
@@ -152,6 +153,12 @@
 
 <p>Print out guest instance parameters.</p>
 
+<h2 id="is_guest_ppc64le">is_guest_ppc64le</h2>
+
+<pre><code>is_guest_ppc64le($self)</code></pre>
+
+<p>Check whether guest architecture is ppc64le.</p>
+
 <h2 id="prepare_common_environment">prepare_common_environment</h2>
 
 <pre><code>prepare_common_environment($self)</code></pre>
@@ -224,11 +231,11 @@
 
 <p>Configure [guest_platform_options].User can still change [guest_arch] and [guest_machine_type] by passing non-empty arguments using hash.</p>
 
-<h2 id="config_guest_os_variant">config_guest_os_variant</h2>
+<h2 id="config_guest_osinfo">config_guest_osinfo</h2>
 
-<pre><code>config_guest_os_variant($self[, guest_os_variant =&gt; &#39;os&#39;])</code></pre>
+<pre><code>config_guest_osinfo($self[, guest_osinfo =&gt; &#39;os&#39;])</code></pre>
 
-<p>Configure [guest_os_variant_options]. User can still change [guest_os_variant] by passing non-empty arguments using hash. If installations already passes, modify_guest_params will be called to modify [guest_os_variant] using already modified [guest_os_variant_options].</p>
+<p>Configure [guest_osinfo_options]. User can still change [guest_osinfo] by passing non-empty arguments using hash. If installations already passes, modify_guest_params will be called to modify [guest_osinfo] using already modified [guest_osinfo_options].</p>
 
 <h2 id="config_guest_graphics_and_video">config_guest_graphics_and_video</h2>
 
@@ -316,9 +323,9 @@
 
 <h2 id="config_guest_storage">config_guest_storage</h2>
 
-<pre><code>config_guest_rng($self [, key-value pairs of guest storage arguments])</code></pre>
+<pre><code>config_guest_storage($self [, key-value pairs of guest storage arguments])</code></pre>
 
-<p>Configure [guest_storage_options]. User can still change [guest_storage_type], [guest_storage_size], [guest_storage_format], [guest_storage_label], [guest_storage_path] and [guest_storage_others] by passing non-empty arguments using hash. If installations already passes, modify_guest_params will be called to modify [guest_storage_type], [guest_storage_size], [guest_storage_format], [guest_storage_path] and [guest_storage_others] using already modified [guest_storage_options].</p>
+<p>Configure [guest_storage_options]. User can still change [guest_storage_type], [guest_storage_size], [guest_storage_format], [guest_storage_label], [guest_storage_path] and [guest_storage_others] by passing non-empty arguments using hash. If installations already passes, modify_guest_params will be called to modify [guest_storage_type], [guest_storage_size], [guest_storage_format], [guest_storage_path] and [guest_storage_others] using already modified [guest_storage_options]. For an import with raw storage and a raw image, use the downloaded image directly.</p>
 
 <h2 id="config_guest_network_selection">config_guest_network_selection</h2>
 
