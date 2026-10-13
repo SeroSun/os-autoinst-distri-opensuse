@@ -457,7 +457,7 @@
     resource_group =&gt; &#39;openqa-rg&#39;,
     name =&gt; &#39;openqa-pip&#39;)</code></pre>
 
-<p>Return an IPv4 public IP address from its name</p>
+<p>Return an IPv4 public IP address from its name or undef on failure.</p>
 
 <dl>
 
@@ -466,6 +466,10 @@
 
 </dd>
 <dt id="name---existing-public-IP-resource-name"><b>name</b> - existing public IP resource name</dt>
+<dd>
+
+</dd>
+<dt id="timeout---optional-command-timeout-in-seconds"><b>timeout</b> - optional command timeout in seconds</dt>
 <dd>
 
 </dd>
@@ -1094,7 +1098,7 @@
     nic_name =&gt; &#39;openqa-nic&#39;,
     ip =&gt; &#39;192.168.0.42&#39;)</code></pre>
 
-<p>Change the IpConfig to use a static IP</p>
+<p>Change the IpConfig to use a static IP. The command uses --debug, to get details about the Azure operation. Sometimes this operation takes about 10 minutes on the Azure side: if the command takes more than 60 seconds, a record_info with result fail reports the duration.</p>
 
 <dl>
 
